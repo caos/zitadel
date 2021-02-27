@@ -4,6 +4,37 @@ import (
 	"testing"
 
 	"github.com/caos/orbos/mntr"
+	"github.com/caos/orbos/pkg/labels/mocklabels"
+	"github.com/caos/zitadel/operator"
+	"github.com/caos/zitadel/operator/zitadel/kinds/iam/zitadel/ingress/protocol/core"
+)
+
+func TestAdaptFuncCover(t *testing.T) {
+	mockpathadapter := func(arguments core.PathArguments) (queryFunc operator.QueryFunc, destroyFunc operator.DestroyFunc, err error) {
+		return nil, nil, nil
+	}
+
+	AdaptFunc(
+		mntr.Monitor{},
+		mocklabels.Component,
+		"",
+		"",
+		0,
+		nil,
+		"",
+		mockpathadapter,
+		mockpathadapter,
+	)
+}
+
+/*
+import (
+	"fmt"
+	"testing"
+
+	"github.com/caos/zitadel/operator/zitadel/kinds/iam/zitadel/ingress/controllers/ambassador"
+
+	"github.com/caos/orbos/mntr"
 	kubernetesmock "github.com/caos/orbos/pkg/kubernetes/mock"
 	"github.com/caos/orbos/pkg/labels"
 	"github.com/caos/orbos/pkg/labels/mocklabels"
@@ -30,11 +61,11 @@ func SetReturnResourceVersion(
 			},
 		},
 	}
-	k8sClient.EXPECT().GetNamespacedCRDResource(group, version, kind, namespace, name).MinTimes(1).MaxTimes(1).Return(ret, nil)
+	k8sClient.EXPECT().GetNamespacedCRDResource(group, version, kind, namespace, name).Return(ret, nil)
 }
 
 func SetCheckCRD(k8sClient *kubernetesmock.MockClientInt) {
-	k8sClient.EXPECT().CheckCRD("mappings.getambassador.io").MinTimes(1).MaxTimes(1).Return(&apixv1beta1.CustomResourceDefinition{}, nil)
+	k8sClient.EXPECT().CheckCRD("mappings.getambassador.io").Times(1).Return(&apixv1beta1.CustomResourceDefinition{}, true, nil)
 }
 
 func SetMappingsEmpty(
@@ -68,7 +99,7 @@ func SetMappingsEmpty(
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, accountsLabels.Name(), "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, accountsLabels.Name(), accounts).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, accountsLabels.Name(), accounts).Times(1)
 
 	console := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -88,14 +119,16 @@ func SetMappingsEmpty(
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, consoleLabels.Name(), "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, consoleLabels.Name(), console).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, consoleLabels.Name(), console).Times(1)
 }
 
 func TestUi_Adapt(t *testing.T) {
 	monitor := mntr.Monitor{}
 	namespace := "test"
-	uiURL := "url"
-	dns := &configuration.DNS{
+	service := "service"
+	var port uint16 = 8080
+	url := fmt.Sprintf("%s:%d", service, port)
+	dns := &configuration.Ingress{
 		Domain:    "",
 		TlsSecret: "",
 		Subdomains: &configuration.Subdomains{
@@ -115,10 +148,21 @@ func TestUi_Adapt(t *testing.T) {
 		namespace,
 		labels.MustForName(componentLabels, AccountsName),
 		labels.MustForName(componentLabels, ConsoleName),
-		uiURL,
+		url,
 	)
 
-	query, _, err := AdaptFunc(monitor, componentLabels, namespace, uiURL, dns)
+	hostAdapter := ambassador.Adapt(".")
+	query, _, err := AdaptFunc(
+		monitor,
+		componentLabels,
+		namespace,
+		service,
+		port,
+		dns.ControllerSpecifics,
+		dns.TlsSecret,
+		hostAdapter,
+		hostAdapter,
+	)
 	assert.NoError(t, err)
 	queried := map[string]interface{}{}
 	ensure, err := query(k8sClient, queried)
@@ -129,8 +173,15 @@ func TestUi_Adapt(t *testing.T) {
 func TestUi_Adapt2(t *testing.T) {
 	monitor := mntr.Monitor{}
 	namespace := "test"
-	uiURL := "url"
-	dns := &configuration.DNS{
+	service := "service"
+	var port uint16 = 8080
+	accountsHost := "accounts.domain"
+	consoleHost := "console.domain"
+	accountsAdapter := ambassador.Adapt(accountsHost)
+	consoleAdapter := ambassador.Adapt(consoleHost)
+
+	url := fmt.Sprintf("%s:%d", service, port)
+	dns := &configuration.Ingress{
 		Domain:    "domain",
 		TlsSecret: "tls",
 		Subdomains: &configuration.Subdomains{
@@ -162,16 +213,16 @@ func TestUi_Adapt2(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               "accounts.domain",
+				"host":               accountsHost,
 				"prefix":             "/",
 				"rewrite":            "/login/",
-				"service":            uiURL,
+				"service":            url,
 				"timeout_ms":         30000,
 			},
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, AccountsName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AccountsName, accounts).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AccountsName, accounts).Times(1)
 
 	consoleName := labels.MustForName(componentLabels, ConsoleName)
 	console := &unstructured.Unstructured{
@@ -184,20 +235,31 @@ func TestUi_Adapt2(t *testing.T) {
 				"namespace": namespace,
 			},
 			"spec": map[string]interface{}{
-				"host":    "console.domain",
+				"host":    consoleHost,
 				"prefix":  "/",
 				"rewrite": "/console/",
-				"service": uiURL,
+				"service": url,
 			},
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, ConsoleName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, ConsoleName, console).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, ConsoleName, console).Times(1)
 
-	query, _, err := AdaptFunc(monitor, componentLabels, namespace, uiURL, dns)
+	query, _, err := AdaptFunc(
+		monitor,
+		componentLabels,
+		namespace,
+		service,
+		port,
+		dns.ControllerSpecifics,
+		dns.TlsSecret,
+		consoleAdapter,
+		accountsAdapter,
+	)
 	assert.NoError(t, err)
 	queried := map[string]interface{}{}
 	ensure, err := query(k8sClient, queried)
 	assert.NoError(t, err)
 	assert.NoError(t, ensure(k8sClient))
 }
+*/

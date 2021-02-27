@@ -2,11 +2,12 @@ package configuration
 
 import (
 	"errors"
+	"testing"
+
 	"github.com/caos/orbos/mntr"
 	kubernetesmock "github.com/caos/orbos/pkg/kubernetes/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestConfiguration_Ready1(t *testing.T) {

@@ -10,14 +10,16 @@ type Configuration struct {
 	Passwords     *Passwords     `yaml:"passwords,omitempty"`
 	DebugMode     bool           `yaml:"debugMode"`
 	LogLevel      string         `yaml:"logLevel"`
-	DNS           *DNS           `yaml:"dns"`
+	Ingress       *Ingress       `yaml:"ingress"`
 	ClusterDNS    string         `yaml:"clusterdns"`
 }
 
-type DNS struct {
-	Domain     string      `yaml:"domain"`
-	TlsSecret  string      `yaml:"tlsSecret"`
-	Subdomains *Subdomains `yaml:"subdomains"`
+type Ingress struct {
+	Domain              string            `yaml:"domain"`
+	TlsSecret           string            `yaml:"tlsSecret"`
+	Subdomains          *Subdomains       `yaml:"subdomains"`
+	Controller          string            `yaml:"controller"`
+	ControllerSpecifics map[string]string `yaml:"controllerSpecifics,omitempty"`
 }
 
 type Subdomains struct {

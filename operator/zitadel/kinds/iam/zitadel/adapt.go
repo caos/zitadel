@@ -1,12 +1,11 @@
 package zitadel
 
 import (
-	"strconv"
-
 	"github.com/caos/orbos/pkg/labels"
 	"github.com/caos/orbos/pkg/orb"
 	"github.com/caos/orbos/pkg/secret"
 	"github.com/caos/zitadel/operator/zitadel/kinds/iam/zitadel/database"
+	"github.com/caos/zitadel/operator/zitadel/kinds/iam/zitadel/ingress"
 	"github.com/caos/zitadel/operator/zitadel/kinds/iam/zitadel/setup"
 
 	core "k8s.io/api/core/v1"
@@ -16,7 +15,6 @@ import (
 	"github.com/caos/orbos/pkg/kubernetes/resources/namespace"
 	"github.com/caos/orbos/pkg/tree"
 	"github.com/caos/zitadel/operator"
-	"github.com/caos/zitadel/operator/zitadel/kinds/iam/zitadel/ambassador"
 	"github.com/caos/zitadel/operator/zitadel/kinds/iam/zitadel/configuration"
 	"github.com/caos/zitadel/operator/zitadel/kinds/iam/zitadel/deployment"
 	"github.com/caos/zitadel/operator/zitadel/kinds/iam/zitadel/migration"
@@ -205,14 +203,17 @@ func AdaptFunc(
 			return nil, nil, allSecrets, err
 		}
 
-		queryAmbassador, destroyAmbassador, err := ambassador.AdaptFunc(
+		queryI, destroyI, err := ingress.AdaptFunc(
 			internalMonitor,
-			labels.MustForComponent(apiLabels, "apiGateway"),
+			apiLabels,
 			namespaceStr,
-			grpcServiceName+"."+namespaceStr+":"+strconv.Itoa(int(grpcPort)),
-			"http://"+httpServiceName+"."+namespaceStr+":"+strconv.Itoa(int(httpPort)),
-			"http://"+uiServiceName+"."+namespaceStr,
-			desiredKind.Spec.Configuration.DNS,
+			grpcServiceName,
+			grpcPort,
+			httpServiceName,
+			httpPort,
+			uiServiceName,
+			uiPort,
+			desiredKind.Spec.Configuration.Ingress,
 		)
 		if err != nil {
 			return nil, nil, allSecrets, err
@@ -248,10 +249,10 @@ func AdaptFunc(
 					querySetup,
 					queryD,
 					operator.EnsureFuncToQueryFunc(deployment.GetReadyFunc(monitor, namespaceStr, zitadelDeploymentName)),
-					queryAmbassador,
+					queryI,
 				)
 				destroyers = append(destroyers,
-					destroyAmbassador,
+					destroyI,
 					destroyS,
 					destroyM,
 					destroyD,

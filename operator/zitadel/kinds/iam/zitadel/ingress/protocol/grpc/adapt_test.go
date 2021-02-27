@@ -3,6 +3,34 @@ package grpc
 import (
 	"testing"
 
+	"github.com/caos/orbos/mntr"
+	"github.com/caos/orbos/pkg/labels/mocklabels"
+	"github.com/caos/zitadel/operator"
+	"github.com/caos/zitadel/operator/zitadel/kinds/iam/zitadel/ingress/protocol/core"
+)
+
+func TestAdaptFuncCover(t *testing.T) {
+	AdaptFunc(
+		mntr.Monitor{},
+		mocklabels.Component,
+		"",
+		"",
+		0,
+		nil,
+		"",
+		func(arguments core.PathArguments) (queryFunc operator.QueryFunc, destroyFunc operator.DestroyFunc, err error) {
+			return nil, nil, nil
+		},
+	)
+}
+
+/*
+import (
+	"fmt"
+	"testing"
+
+	"github.com/caos/zitadel/operator/zitadel/kinds/iam/zitadel/ingress/controllers/ambassador"
+
 	"github.com/caos/orbos/pkg/labels"
 
 	"github.com/caos/orbos/mntr"
@@ -31,14 +59,18 @@ func SetReturnResourceVersion(
 			},
 		},
 	}
-	k8sClient.EXPECT().GetNamespacedCRDResource(group, version, kind, namespace, name).MinTimes(1).MaxTimes(1).Return(ret, nil)
+	k8sClient.EXPECT().GetNamespacedCRDResource(group, version, kind, namespace, name).Return(ret, nil)
 }
 
 func TestGrpc_Adapt(t *testing.T) {
 	monitor := mntr.Monitor{}
 	namespace := "test"
-	url := "url"
-	dns := &configuration.DNS{
+	service := "service"
+	host := "host.blubb"
+	hostAdapter := ambassador.Adapt(host)
+	var port uint16 = 8080
+	url := fmt.Sprintf("%s:%d", service, port)
+	dns := &configuration.Ingress{
 		Domain:    "",
 		TlsSecret: "",
 		Subdomains: &configuration.Subdomains{
@@ -53,7 +85,7 @@ func TestGrpc_Adapt(t *testing.T) {
 
 	k8sClient := kubernetesmock.NewMockClientInt(gomock.NewController(t))
 
-	k8sClient.EXPECT().CheckCRD("mappings.getambassador.io").MinTimes(1).MaxTimes(1).Return(&apixv1beta1.CustomResourceDefinition{}, nil)
+	k8sClient.EXPECT().CheckCRD("mappings.getambassador.io").Times(1).Return(&apixv1beta1.CustomResourceDefinition{}, true, nil)
 
 	group := "getambassador.io"
 	version := "v2"
@@ -67,7 +99,7 @@ func TestGrpc_Adapt(t *testing.T) {
 		"exposed_headers": "*",
 		"max_age":         "86400",
 	}
-	adminMName := labels.MustForName(componentLabels, AdminMName)
+	adminMName := labels.MustForName(componentLabels, AdminIName)
 	adminM := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": group + "/" + version,
@@ -79,9 +111,9 @@ func TestGrpc_Adapt(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               ".",
+				"host":               host,
 				"prefix":             "/caos.zitadel.admin.api.v1.AdminService/",
-				"rewrite":            "",
+				"rewrite":            "/caos.zitadel.admin.api.v1.AdminService/",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -89,10 +121,10 @@ func TestGrpc_Adapt(t *testing.T) {
 			},
 		},
 	}
-	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, AdminMName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AdminMName, adminM).MinTimes(1).MaxTimes(1)
+	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, AdminIName, "")
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AdminIName, adminM).Times(1)
 
-	authMName := labels.MustForName(componentLabels, AuthMName)
+	authMName := labels.MustForName(componentLabels, AuthIName)
 	authM := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": group + "/" + version,
@@ -104,9 +136,9 @@ func TestGrpc_Adapt(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               ".",
+				"host":               host,
 				"prefix":             "/caos.zitadel.auth.api.v1.AuthService/",
-				"rewrite":            "",
+				"rewrite":            "/caos.zitadel.auth.api.v1.AuthService/",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -114,10 +146,10 @@ func TestGrpc_Adapt(t *testing.T) {
 			},
 		},
 	}
-	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, AuthMName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AuthMName, authM).MinTimes(1).MaxTimes(1)
+	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, AuthIName, "")
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AuthIName, authM).Times(1)
 
-	mgmtMName := labels.MustForName(componentLabels, MgmtMName)
+	mgmtMName := labels.MustForName(componentLabels, MgmtIName)
 	mgmtM := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": group + "/" + version,
@@ -129,9 +161,9 @@ func TestGrpc_Adapt(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               ".",
+				"host":               host,
 				"prefix":             "/caos.zitadel.management.api.v1.ManagementService/",
-				"rewrite":            "",
+				"rewrite":            "/caos.zitadel.management.api.v1.ManagementService/",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -139,10 +171,19 @@ func TestGrpc_Adapt(t *testing.T) {
 			},
 		},
 	}
-	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, MgmtMName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, MgmtMName, mgmtM).MinTimes(1).MaxTimes(1)
+	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, MgmtIName, "")
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, MgmtIName, mgmtM).Times(1)
 
-	query, _, err := AdaptFunc(monitor, componentLabels, namespace, url, dns)
+	query, _, err := AdaptFunc(
+		monitor,
+		componentLabels,
+		namespace,
+		service,
+		port,
+		dns.ControllerSpecifics,
+		dns.TlsSecret,
+		hostAdapter,
+	)
 	assert.NoError(t, err)
 	queried := map[string]interface{}{}
 	ensure, err := query(k8sClient, queried)
@@ -153,8 +194,12 @@ func TestGrpc_Adapt(t *testing.T) {
 func TestGrpc_Adapt2(t *testing.T) {
 	monitor := mntr.Monitor{}
 	namespace := "test"
-	url := "url"
-	dns := &configuration.DNS{
+	service := "service"
+	var port uint16 = 8080
+	host := "api.domain"
+	hostAdapter := ambassador.Adapt(host)
+	url := fmt.Sprintf("%s:%d", service, port)
+	dns := &configuration.Ingress{
 		Domain:    "domain",
 		TlsSecret: "tls",
 		Subdomains: &configuration.Subdomains{
@@ -169,7 +214,7 @@ func TestGrpc_Adapt2(t *testing.T) {
 
 	k8sClient := kubernetesmock.NewMockClientInt(gomock.NewController(t))
 
-	k8sClient.EXPECT().CheckCRD("mappings.getambassador.io").MinTimes(1).MaxTimes(1).Return(&apixv1beta1.CustomResourceDefinition{}, nil)
+	k8sClient.EXPECT().CheckCRD("mappings.getambassador.io").Times(1).Return(&apixv1beta1.CustomResourceDefinition{}, true, nil)
 
 	group := "getambassador.io"
 	version := "v2"
@@ -184,7 +229,7 @@ func TestGrpc_Adapt2(t *testing.T) {
 		"max_age":         "86400",
 	}
 
-	adminMName := labels.MustForName(componentLabels, AdminMName)
+	adminMName := labels.MustForName(componentLabels, AdminIName)
 	adminM := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": group + "/" + version,
@@ -196,9 +241,9 @@ func TestGrpc_Adapt2(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               "api.domain",
+				"host":               host,
 				"prefix":             "/caos.zitadel.admin.api.v1.AdminService/",
-				"rewrite":            "",
+				"rewrite":            "/caos.zitadel.admin.api.v1.AdminService/",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -206,10 +251,10 @@ func TestGrpc_Adapt2(t *testing.T) {
 			},
 		},
 	}
-	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, AdminMName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AdminMName, adminM).MinTimes(1).MaxTimes(1)
+	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, AdminIName, "")
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AdminIName, adminM).Times(1)
 
-	authMName := labels.MustForName(componentLabels, AuthMName)
+	authMName := labels.MustForName(componentLabels, AuthIName)
 	authM := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": group + "/" + version,
@@ -221,9 +266,9 @@ func TestGrpc_Adapt2(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               "api.domain",
+				"host":               host,
 				"prefix":             "/caos.zitadel.auth.api.v1.AuthService/",
-				"rewrite":            "",
+				"rewrite":            "/caos.zitadel.auth.api.v1.AuthService/",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -231,10 +276,10 @@ func TestGrpc_Adapt2(t *testing.T) {
 			},
 		},
 	}
-	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, AuthMName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AuthMName, authM).MinTimes(1).MaxTimes(1)
+	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, AuthIName, "")
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AuthIName, authM).Times(1)
 
-	mgmtMName := labels.MustForName(componentLabels, MgmtMName)
+	mgmtMName := labels.MustForName(componentLabels, MgmtIName)
 	mgmtM := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": group + "/" + version,
@@ -246,9 +291,9 @@ func TestGrpc_Adapt2(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               "api.domain",
+				"host":               host,
 				"prefix":             "/caos.zitadel.management.api.v1.ManagementService/",
-				"rewrite":            "",
+				"rewrite":            "/caos.zitadel.management.api.v1.ManagementService/",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -256,13 +301,23 @@ func TestGrpc_Adapt2(t *testing.T) {
 			},
 		},
 	}
-	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, MgmtMName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, MgmtMName, mgmtM).MinTimes(1).MaxTimes(1)
+	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, MgmtIName, "")
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, MgmtIName, mgmtM).Times(1)
 
-	query, _, err := AdaptFunc(monitor, componentLabels, namespace, url, dns)
+	query, _, err := AdaptFunc(
+		monitor,
+		componentLabels,
+		namespace,
+		service,
+		port,
+		dns.ControllerSpecifics,
+		dns.TlsSecret,
+		hostAdapter,
+	)
 	assert.NoError(t, err)
 	queried := map[string]interface{}{}
 	ensure, err := query(k8sClient, queried)
 	assert.NoError(t, err)
 	assert.NoError(t, ensure(k8sClient))
 }
+*/

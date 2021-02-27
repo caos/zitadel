@@ -1,9 +1,10 @@
 package managed
 
 import (
-	"gopkg.in/yaml.v3"
 	"testing"
 	"time"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/caos/orbos/mntr"
 	kubernetesmock "github.com/caos/orbos/pkg/kubernetes/mock"
@@ -106,6 +107,7 @@ func TestManaged_Adapt1(t *testing.T) {
 	}
 
 	k8sClient.EXPECT().ApplyService(gomock.Any()).Times(3)
+
 	k8sClient.EXPECT().ApplyServiceAccount(gomock.Any()).MinTimes(1).MaxTimes(1)
 	k8sClient.EXPECT().ApplyRole(gomock.Any()).MinTimes(1).MaxTimes(1)
 	k8sClient.EXPECT().ApplyClusterRole(gomock.Any()).MinTimes(1).MaxTimes(1)

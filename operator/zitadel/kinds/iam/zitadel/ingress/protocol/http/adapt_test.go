@@ -4,6 +4,38 @@ import (
 	"testing"
 
 	"github.com/caos/orbos/mntr"
+	"github.com/caos/orbos/pkg/labels/mocklabels"
+	"github.com/caos/zitadel/operator"
+	"github.com/caos/zitadel/operator/zitadel/kinds/iam/zitadel/ingress/protocol/core"
+)
+
+func TestAdaptFuncCover(t *testing.T) {
+	mockpathadapter := func(arguments core.PathArguments) (queryFunc operator.QueryFunc, destroyFunc operator.DestroyFunc, err error) {
+		return nil, nil, nil
+	}
+
+	AdaptFunc(
+		mntr.Monitor{},
+		mocklabels.Component,
+		"",
+		"",
+		0,
+		nil,
+		"",
+		mockpathadapter,
+		mockpathadapter,
+		mockpathadapter,
+	)
+}
+
+/*
+import (
+	"fmt"
+	"testing"
+
+	"github.com/caos/zitadel/operator/zitadel/kinds/iam/zitadel/ingress/controllers/ambassador"
+
+	"github.com/caos/orbos/mntr"
 	kubernetesmock "github.com/caos/orbos/pkg/kubernetes/mock"
 	"github.com/caos/orbos/pkg/labels"
 	"github.com/caos/orbos/pkg/labels/mocklabels"
@@ -30,14 +62,18 @@ func SetReturnResourceVersion(
 			},
 		},
 	}
-	k8sClient.EXPECT().GetNamespacedCRDResource(group, version, kind, namespace, name).MinTimes(1).MaxTimes(1).Return(ret, nil)
+	k8sClient.EXPECT().GetNamespacedCRDResource(group, version, kind, namespace, name).Return(ret, nil)
 }
 
 func TestHttp_Adapt(t *testing.T) {
 	monitor := mntr.Monitor{}
 	namespace := "test"
-	url := "url"
-	dns := &configuration.DNS{
+	service := "service"
+	host := "."
+	hostAdapter := ambassador.Adapt(host)
+	var port uint16 = 8080
+	url := fmt.Sprintf("%s:%d", service, port)
+	dns := &configuration.Ingress{
 		Domain:    "",
 		TlsSecret: "",
 		Subdomains: &configuration.Subdomains{
@@ -49,7 +85,7 @@ func TestHttp_Adapt(t *testing.T) {
 	}
 	k8sClient := kubernetesmock.NewMockClientInt(gomock.NewController(t))
 
-	k8sClient.EXPECT().CheckCRD("mappings.getambassador.io").MinTimes(1).MaxTimes(1).Return(&apixv1beta1.CustomResourceDefinition{}, nil)
+	k8sClient.EXPECT().CheckCRD("mappings.getambassador.io").Times(1).Return(&apixv1beta1.CustomResourceDefinition{}, true, nil)
 
 	group := "getambassador.io"
 	version := "v2"
@@ -77,9 +113,9 @@ func TestHttp_Adapt(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               ".",
+				"host":               host,
 				"prefix":             "/oauth/v2/endsession",
-				"rewrite":            "",
+				"rewrite":            "/oauth/v2/endsession",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -87,7 +123,7 @@ func TestHttp_Adapt(t *testing.T) {
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, EndsessionName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, EndsessionName, endsession).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, EndsessionName, endsession).Times(1)
 
 	issuerName := labels.MustForName(componentLabels, IssuerName)
 	issuer := &unstructured.Unstructured{
@@ -101,7 +137,7 @@ func TestHttp_Adapt(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               ".",
+				"host":               host,
 				"prefix":             "/.well-known/openid-configuration",
 				"rewrite":            "/oauth/v2/.well-known/openid-configuration",
 				"service":            url,
@@ -111,7 +147,7 @@ func TestHttp_Adapt(t *testing.T) {
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, IssuerName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, IssuerName, issuer).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, IssuerName, issuer).Times(1)
 
 	authorizeName := labels.MustForName(componentLabels, AuthorizeName)
 	authorize := &unstructured.Unstructured{
@@ -125,9 +161,9 @@ func TestHttp_Adapt(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               ".",
+				"host":               host,
 				"prefix":             "/oauth/v2/authorize",
-				"rewrite":            "",
+				"rewrite":            "/oauth/v2/authorize",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -135,7 +171,7 @@ func TestHttp_Adapt(t *testing.T) {
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, AuthorizeName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AuthorizeName, authorize).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AuthorizeName, authorize).Times(1)
 
 	oauthName := labels.MustForName(componentLabels, OauthName)
 	oauth := &unstructured.Unstructured{
@@ -149,9 +185,9 @@ func TestHttp_Adapt(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               ".",
+				"host":               host,
 				"prefix":             "/oauth/v2/",
-				"rewrite":            "",
+				"rewrite":            "/oauth/v2/",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -159,7 +195,7 @@ func TestHttp_Adapt(t *testing.T) {
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, OauthName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, OauthName, oauth).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, OauthName, oauth).Times(1)
 
 	mgmtName := labels.MustForName(componentLabels, MgmtName)
 	mgmt := &unstructured.Unstructured{
@@ -173,9 +209,9 @@ func TestHttp_Adapt(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               ".",
+				"host":               host,
 				"prefix":             "/management/v1/",
-				"rewrite":            "",
+				"rewrite":            "/management/v1/",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -183,7 +219,7 @@ func TestHttp_Adapt(t *testing.T) {
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, MgmtName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, MgmtName, mgmt).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, MgmtName, mgmt).Times(1)
 
 	adminRName := labels.MustForName(componentLabels, AdminRName)
 	adminR := &unstructured.Unstructured{
@@ -197,9 +233,9 @@ func TestHttp_Adapt(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               ".",
+				"host":               host,
 				"prefix":             "/admin/v1",
-				"rewrite":            "",
+				"rewrite":            "/admin/v1",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -207,7 +243,7 @@ func TestHttp_Adapt(t *testing.T) {
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, AdminRName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AdminRName, adminR).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AdminRName, adminR).Times(1)
 
 	authRName := labels.MustForName(componentLabels, AuthRName)
 	authR := &unstructured.Unstructured{
@@ -221,9 +257,9 @@ func TestHttp_Adapt(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               ".",
+				"host":               host,
 				"prefix":             "/auth/v1/",
-				"rewrite":            "",
+				"rewrite":            "/auth/v1/",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -231,9 +267,20 @@ func TestHttp_Adapt(t *testing.T) {
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, AuthRName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AuthRName, authR).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AuthRName, authR).Times(1)
 
-	query, _, err := AdaptFunc(monitor, componentLabels, namespace, url, dns)
+	query, _, err := AdaptFunc(
+		monitor,
+		componentLabels,
+		namespace,
+		service,
+		port,
+		dns.ControllerSpecifics,
+		dns.TlsSecret,
+		hostAdapter,
+		hostAdapter,
+		hostAdapter,
+	)
 	assert.NoError(t, err)
 	queried := map[string]interface{}{}
 	ensure, err := query(k8sClient, queried)
@@ -244,8 +291,17 @@ func TestHttp_Adapt(t *testing.T) {
 func TestHttp_Adapt2(t *testing.T) {
 	monitor := mntr.Monitor{}
 	namespace := "test"
-	url := "url"
-	dns := &configuration.DNS{
+	service := "service"
+	var port uint16 = 8080
+
+	accountsHost := "accounts.domain"
+	issuerHost := "issuer.domain"
+	apiHost := "api.domain"
+	accountsAdapter := ambassador.Adapt(accountsHost)
+	issuerAdapter := ambassador.Adapt(issuerHost)
+	apiAdapter := ambassador.Adapt(apiHost)
+	url := fmt.Sprintf("%s:%d", service, port)
+	dns := &configuration.Ingress{
 		Domain:    "domain",
 		TlsSecret: "tls",
 		Subdomains: &configuration.Subdomains{
@@ -257,7 +313,7 @@ func TestHttp_Adapt2(t *testing.T) {
 	}
 	k8sClient := kubernetesmock.NewMockClientInt(gomock.NewController(t))
 
-	k8sClient.EXPECT().CheckCRD("mappings.getambassador.io").MinTimes(1).MaxTimes(1).Return(&apixv1beta1.CustomResourceDefinition{}, nil)
+	k8sClient.EXPECT().CheckCRD("mappings.getambassador.io").Times(1).Return(&apixv1beta1.CustomResourceDefinition{}, true, nil)
 
 	group := "getambassador.io"
 	version := "v2"
@@ -286,9 +342,9 @@ func TestHttp_Adapt2(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               "accounts.domain",
+				"host":               accountsHost,
 				"prefix":             "/oauth/v2/endsession",
-				"rewrite":            "",
+				"rewrite":            "/oauth/v2/endsession",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -296,7 +352,7 @@ func TestHttp_Adapt2(t *testing.T) {
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, EndsessionName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, EndsessionName, endsession).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, EndsessionName, endsession).Times(1)
 
 	issuerName := labels.MustForName(componentLabels, IssuerName)
 	issuer := &unstructured.Unstructured{
@@ -310,7 +366,7 @@ func TestHttp_Adapt2(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               "issuer.domain",
+				"host":               issuerHost,
 				"prefix":             "/.well-known/openid-configuration",
 				"rewrite":            "/oauth/v2/.well-known/openid-configuration",
 				"service":            url,
@@ -320,7 +376,7 @@ func TestHttp_Adapt2(t *testing.T) {
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, IssuerName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, IssuerName, issuer).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, IssuerName, issuer).Times(1)
 
 	authorizeName := labels.MustForName(componentLabels, AuthorizeName)
 	authorize := &unstructured.Unstructured{
@@ -334,9 +390,9 @@ func TestHttp_Adapt2(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               "accounts.domain",
+				"host":               accountsHost,
 				"prefix":             "/oauth/v2/authorize",
-				"rewrite":            "",
+				"rewrite":            "/oauth/v2/authorize",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -344,7 +400,7 @@ func TestHttp_Adapt2(t *testing.T) {
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, AuthorizeName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AuthorizeName, authorize).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AuthorizeName, authorize).Times(1)
 
 	oauthName := labels.MustForName(componentLabels, OauthName)
 	oauth := &unstructured.Unstructured{
@@ -358,9 +414,9 @@ func TestHttp_Adapt2(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               "api.domain",
+				"host":               apiHost,
 				"prefix":             "/oauth/v2/",
-				"rewrite":            "",
+				"rewrite":            "/oauth/v2/",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -368,7 +424,7 @@ func TestHttp_Adapt2(t *testing.T) {
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, OauthName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, OauthName, oauth).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, OauthName, oauth).Times(1)
 
 	mgmtName := labels.MustForName(componentLabels, MgmtName)
 	mgmt := &unstructured.Unstructured{
@@ -382,9 +438,9 @@ func TestHttp_Adapt2(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               "api.domain",
+				"host":               apiHost,
 				"prefix":             "/management/v1/",
-				"rewrite":            "",
+				"rewrite":            "/management/v1/",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -392,7 +448,7 @@ func TestHttp_Adapt2(t *testing.T) {
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, MgmtName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, MgmtName, mgmt).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, MgmtName, mgmt).Times(1)
 
 	adminRName := labels.MustForName(componentLabels, AdminRName)
 	adminR := &unstructured.Unstructured{
@@ -406,9 +462,9 @@ func TestHttp_Adapt2(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               "api.domain",
+				"host":               apiHost,
 				"prefix":             "/admin/v1",
-				"rewrite":            "",
+				"rewrite":            "/admin/v1",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -416,7 +472,7 @@ func TestHttp_Adapt2(t *testing.T) {
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, AdminRName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AdminRName, adminR).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AdminRName, adminR).Times(1)
 
 	authRName := labels.MustForName(componentLabels, AuthRName)
 	authR := &unstructured.Unstructured{
@@ -430,9 +486,9 @@ func TestHttp_Adapt2(t *testing.T) {
 			},
 			"spec": map[string]interface{}{
 				"connect_timeout_ms": 30000,
-				"host":               "api.domain",
+				"host":               apiHost,
 				"prefix":             "/auth/v1/",
-				"rewrite":            "",
+				"rewrite":            "/auth/v1/",
 				"service":            url,
 				"timeout_ms":         30000,
 				"cors":               cors,
@@ -440,12 +496,24 @@ func TestHttp_Adapt2(t *testing.T) {
 		},
 	}
 	SetReturnResourceVersion(k8sClient, group, version, kind, namespace, AuthRName, "")
-	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AuthRName, authR).MinTimes(1).MaxTimes(1)
+	k8sClient.EXPECT().ApplyNamespacedCRDResource(group, version, kind, namespace, AuthRName, authR).Times(1)
 
-	query, _, err := AdaptFunc(monitor, componentLabels, namespace, url, dns)
+	query, _, err := AdaptFunc(
+		monitor,
+		componentLabels,
+		namespace,
+		service,
+		port,
+		dns.ControllerSpecifics,
+		dns.TlsSecret,
+		apiAdapter,
+		accountsAdapter,
+		issuerAdapter,
+	)
 	assert.NoError(t, err)
 	queried := map[string]interface{}{}
 	ensure, err := query(k8sClient, queried)
 	assert.NoError(t, err)
 	assert.NoError(t, ensure(k8sClient))
 }
+*/
