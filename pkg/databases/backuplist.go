@@ -9,57 +9,52 @@ import (
 	orbdb "github.com/caos/zitadel/operator/database/kinds/orb"
 )
 
-func GitOpsInstantBackup(
+func GitOpsListBackups(
 	monitor mntr.Monitor,
-	k8sClient kubernetes.ClientInt,
 	gitClient *git.Client,
-	name string,
-) error {
+	k8sClient kubernetes.ClientInt,
+) (
+	[]string,
+	error,
+) {
 	desired, err := gitClient.ReadTree(git.DatabaseFile)
 	if err != nil {
 		monitor.Error(err)
-		return err
+		return nil, err
 	}
-	return instantBackup(monitor, k8sClient, desired, name)
+
+	return listBackups(monitor, k8sClient, desired)
 }
 
-func CrdInstantBackup(
+func CrdListBackups(
 	monitor mntr.Monitor,
 	k8sClient kubernetes.ClientInt,
-	name string,
-) error {
+) (
+	[]string,
+	error,
+) {
 	desired, err := database.ReadCrd(k8sClient)
 	if err != nil {
 		monitor.Error(err)
-		return err
+		return nil, err
 	}
-	return instantBackup(monitor, k8sClient, desired, name)
+
+	return listBackups(monitor, k8sClient, desired)
 }
 
-func instantBackup(
+func listBackups(
 	monitor mntr.Monitor,
 	k8sClient kubernetes.ClientInt,
 	desired *tree.Tree,
-	name string,
-) error {
-	current := &tree.Tree{}
-
-	query, _, _, _, _, _, err := orbdb.AdaptFunc(name, nil, false, "instantbackup")(monitor, desired, current)
+) (
+	[]string,
+	error,
+) {
+	backups, err := orbdb.BackupListFunc()(monitor, k8sClient, desired)
 	if err != nil {
 		monitor.Error(err)
-		return err
+		return nil, err
 	}
 
-	queried := map[string]interface{}{}
-	ensure, err := query(k8sClient, queried)
-	if err != nil {
-		monitor.Error(err)
-		return err
-	}
-
-	if err := ensure(k8sClient); err != nil {
-		monitor.Error(err)
-		return err
-	}
-	return nil
+	return backups, nil
 }

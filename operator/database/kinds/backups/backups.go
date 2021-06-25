@@ -2,6 +2,7 @@ package backups
 
 import (
 	"github.com/caos/orbos/mntr"
+	"github.com/caos/orbos/pkg/kubernetes"
 	"github.com/caos/orbos/pkg/labels"
 	"github.com/caos/orbos/pkg/secret"
 	"github.com/caos/orbos/pkg/tree"
@@ -23,6 +24,8 @@ func Adapt(
 	nodeselector map[string]string,
 	tolerations []corev1.Toleration,
 	version string,
+	dbURL string,
+	dbPort int32,
 	features []string,
 ) (
 	operator.QueryFunc,
@@ -50,6 +53,8 @@ func Adapt(
 			nodeselector,
 			tolerations,
 			version,
+			dbURL,
+			dbPort,
 			features,
 		)(monitor, desiredTree, currentTree)
 	default:
@@ -59,6 +64,7 @@ func Adapt(
 
 func GetBackupList(
 	monitor mntr.Monitor,
+	k8sClient kubernetes.ClientInt,
 	name string,
 	desiredTree *tree.Tree,
 ) (
@@ -67,7 +73,7 @@ func GetBackupList(
 ) {
 	switch desiredTree.Common.Kind {
 	case "databases.caos.ch/BucketBackup":
-		return bucket.BackupList()(monitor, name, desiredTree)
+		return bucket.BackupList()(monitor, k8sClient, name, desiredTree)
 	default:
 		return nil, errors.Errorf("unknown database kind %s", desiredTree.Common.Kind)
 	}
