@@ -106,6 +106,18 @@ Adds a new oidc identity provider configuration the IAM
     POST: /idps/oidc
 
 
+### AddAuthConnectorIDP
+
+> **rpc** AddAuthConnectorIDP([AddAuthConnectorIDPRequest](#addauthconnectoridprequest))
+[AddAuthConnectorIDPResponse](#addauthconnectoridpresponse)
+
+Adds a new ZITADEL AuthConnector identity provider configuration the IAM
+
+
+
+    POST: /idps/auth_connector
+
+
 ### UpdateIDP
 
 > **rpc** UpdateIDP([UpdateIDPRequest](#updateidprequest))
@@ -168,6 +180,19 @@ all fields are updated. If no value is provided the field will be empty afterwar
 
 
     PUT: /idps/{idp_id}/oidc_config
+
+
+### UpdateIDPAuthConnectorConfig
+
+> **rpc** UpdateIDPAuthConnectorConfig([UpdateIDPAuthConnectorConfigRequest](#updateidpauthconnectorconfigrequest))
+[UpdateIDPAuthConnectorConfigResponse](#updateidpauthconnectorconfigresponse)
+
+Updates the auth connector configuration of the specified idp
+all fields are updated. If no value is provided the field will be empty afterwards.
+
+
+
+    PUT: /idps/{idp_id}/auth_connector_config
 
 
 ### GetDefaultFeatures
@@ -968,6 +993,33 @@ This is an empty request
 | Field | Type | Description | Validation |
 | ----- | ---- | ----------- | ----------- |
 | details |  zitadel.v1.ObjectDetails | - |  |
+
+
+
+
+### AddAuthConnectorIDPRequest
+
+
+
+| Field | Type | Description | Validation |
+| ----- | ---- | ----------- | ----------- |
+| name |  string | - | string.min_len: 1<br /> string.max_len: 200<br />  |
+| styling_type |  zitadel.idp.v1.IDPStylingType | - | enum.defined_only: true<br />  |
+| base_url |  string | - | string.min_len: 1<br /> string.max_len: 200<br />  |
+| provider_id |  string | - |  |
+| machine_id |  string | - | string.min_len: 1<br /> string.max_len: 200<br />  |
+
+
+
+
+### AddAuthConnectorIDPResponse
+
+
+
+| Field | Type | Description | Validation |
+| ----- | ---- | ----------- | ----------- |
+| details |  zitadel.v1.ObjectDetails | - |  |
+| idp_id |  string | - |  |
 
 
 
@@ -2483,6 +2535,31 @@ This is an empty request
 
 
 ### UpdateIAMMemberResponse
+
+
+
+| Field | Type | Description | Validation |
+| ----- | ---- | ----------- | ----------- |
+| details |  zitadel.v1.ObjectDetails | - |  |
+
+
+
+
+### UpdateIDPAuthConnectorConfigRequest
+
+
+
+| Field | Type | Description | Validation |
+| ----- | ---- | ----------- | ----------- |
+| idp_id |  string | - | string.min_len: 1<br /> string.max_len: 200<br />  |
+| base_url |  string | - | string.min_len: 1<br /> string.max_len: 200<br />  |
+| provider_id |  string | - |  |
+| machine_id |  string | - | string.min_len: 1<br /> string.max_len: 200<br />  |
+
+
+
+
+### UpdateIDPAuthConnectorConfigResponse
 
 
 

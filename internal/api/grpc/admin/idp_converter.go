@@ -10,16 +10,7 @@ import (
 	admin_pb "github.com/caos/zitadel/pkg/grpc/admin"
 )
 
-func addOIDCIDPRequestToDomain(req *admin_pb.AddOIDCIDPRequest) *domain.IDPConfig {
-	return &domain.IDPConfig{
-		Name:        req.Name,
-		OIDCConfig:  addOIDCIDPRequestToDomainOIDCIDPConfig(req),
-		StylingType: idp_grpc.IDPStylingTypeToDomain(req.StylingType),
-		Type:        domain.IDPConfigTypeOIDC,
-	}
-}
-
-func addOIDCIDPRequestToDomainOIDCIDPConfig(req *admin_pb.AddOIDCIDPRequest) *domain.OIDCIDPConfig {
+func addOIDCIDPRequestToDomain(req *admin_pb.AddOIDCIDPRequest) *domain.OIDCIDPConfig {
 	return &domain.OIDCIDPConfig{
 		ClientID:              req.ClientId,
 		ClientSecretString:    req.ClientSecret,
@@ -29,11 +20,29 @@ func addOIDCIDPRequestToDomainOIDCIDPConfig(req *admin_pb.AddOIDCIDPRequest) *do
 		Scopes:                req.Scopes,
 		IDPDisplayNameMapping: idp_grpc.MappingFieldToDomain(req.DisplayNameMapping),
 		UsernameMapping:       idp_grpc.MappingFieldToDomain(req.UsernameMapping),
+		CommonIDPConfig: domain.CommonIDPConfig{
+			Name:        req.Name,
+			StylingType: idp_grpc.IDPStylingTypeToDomain(req.StylingType),
+			Type:        domain.IDPConfigTypeOIDC,
+		},
 	}
 }
 
-func updateIDPToDomain(req *admin_pb.UpdateIDPRequest) *domain.IDPConfig {
-	return &domain.IDPConfig{
+func addAuthConnectorIDPRequestToDomain(req *admin_pb.AddAuthConnectorIDPRequest) *domain.AuthConnectorIDPConfig {
+	return &domain.AuthConnectorIDPConfig{
+		BaseURL:    req.BaseUrl,
+		ProviderID: req.ProviderId,
+		MachineID:  req.MachineId,
+		CommonIDPConfig: domain.CommonIDPConfig{
+			Name:        req.Name,
+			StylingType: idp_grpc.IDPStylingTypeToDomain(req.StylingType),
+			Type:        domain.IDPConfigTypeAuthConnector,
+		},
+	}
+}
+
+func updateIDPToDomain(req *admin_pb.UpdateIDPRequest) *domain.CommonIDPConfig {
+	return &domain.CommonIDPConfig{
 		IDPConfigID: req.IdpId,
 		Name:        req.Name,
 		StylingType: idp_grpc.IDPStylingTypeToDomain(req.StylingType),
@@ -42,7 +51,9 @@ func updateIDPToDomain(req *admin_pb.UpdateIDPRequest) *domain.IDPConfig {
 
 func updateOIDCConfigToDomain(req *admin_pb.UpdateIDPOIDCConfigRequest) *domain.OIDCIDPConfig {
 	return &domain.OIDCIDPConfig{
-		IDPConfigID:           req.IdpId,
+		CommonIDPConfig: domain.CommonIDPConfig{
+			IDPConfigID: req.IdpId,
+		},
 		ClientID:              req.ClientId,
 		ClientSecretString:    req.ClientSecret,
 		Issuer:                req.Issuer,
@@ -51,6 +62,17 @@ func updateOIDCConfigToDomain(req *admin_pb.UpdateIDPOIDCConfigRequest) *domain.
 		Scopes:                req.Scopes,
 		IDPDisplayNameMapping: idp_grpc.MappingFieldToDomain(req.DisplayNameMapping),
 		UsernameMapping:       idp_grpc.MappingFieldToDomain(req.UsernameMapping),
+	}
+}
+
+func updateAuthConnectorConfigToDomain(req *admin_pb.UpdateIDPAuthConnectorConfigRequest) *domain.AuthConnectorIDPConfig {
+	return &domain.AuthConnectorIDPConfig{
+		CommonIDPConfig: domain.CommonIDPConfig{
+			IDPConfigID: req.IdpId,
+		},
+		BaseURL:    req.BaseUrl,
+		ProviderID: req.ProviderId,
+		MachineID:  req.MachineId,
 	}
 }
 

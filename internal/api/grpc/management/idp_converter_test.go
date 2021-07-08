@@ -39,48 +39,17 @@ func Test_addOIDCIDPRequestToDomain(t *testing.T) {
 			got := addOIDCIDPRequestToDomain(tt.args.req)
 			test.AssertFieldsMapped(t, got,
 				"ObjectRoot",
-				"OIDCConfig.ClientSecret",
-				"OIDCConfig.ObjectRoot",
-				"OIDCConfig.IDPConfigID",
-				"IDPConfigID",
-				"State",
-				"Type", //TODO: default (0) is oidc
-			)
-		})
-	}
-}
-
-func Test_addOIDCIDPRequestToDomainOIDCIDPConfig(t *testing.T) {
-	type args struct {
-		req *mgmt_pb.AddOrgOIDCIDPRequest
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		{
-			name: "all fields filled",
-			args: args{
-				req: &mgmt_pb.AddOrgOIDCIDPRequest{
-					ClientId:              "test1234",
-					ClientSecret:          "test4321",
-					Issuer:                "zitadel.ch",
-					AuthorizationEndpoint: "https://accounts.zitadel.ch/oauth/v2/authorize",
-					TokenEndpoint:         "https://api.zitadel.ch/oauth/v2/token",
-					Scopes:                []string{"email", "profile"},
-					DisplayNameMapping:    idp.OIDCMappingField_OIDC_MAPPING_FIELD_EMAIL,
-					UsernameMapping:       idp.OIDCMappingField_OIDC_MAPPING_FIELD_PREFERRED_USERNAME,
-				},
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := addOIDCIDPRequestToDomainOIDCIDPConfig(tt.args.req)
-			test.AssertFieldsMapped(t, got,
-				"ObjectRoot",
-				"ClientSecret", //TODO: is client secret string enough for backend?
-				"IDPConfigID",
+				"ClientSecret",
+				"CommonIDPConfig.IDPConfigID",
+				"CommonIDPConfig.IDPProviderType",
+				"CommonIDPConfig.ObjectRoot",
+				"CommonIDPConfig.ObjectRoot.AggregateID",
+				"CommonIDPConfig.ObjectRoot.ChangeDate",
+				"CommonIDPConfig.ObjectRoot.CreationDate",
+				"CommonIDPConfig.ObjectRoot.ResourceOwner",
+				"CommonIDPConfig.ObjectRoot.Sequence",
+				"CommonIDPConfig.State",
+				"CommonIDPConfig.Type",
 			)
 		})
 	}
@@ -110,9 +79,9 @@ func Test_updateIDPToDomain(t *testing.T) {
 			got := updateIDPToDomain(tt.args.req)
 			test.AssertFieldsMapped(t, got,
 				"ObjectRoot",
-				"OIDCConfig",
 				"State",
 				"Type", //TODO: type should not be changeable
+				"IDPProviderType",
 			)
 		})
 	}
@@ -149,6 +118,17 @@ func Test_updateOIDCConfigToDomain(t *testing.T) {
 			test.AssertFieldsMapped(t, got,
 				"ObjectRoot",
 				"ClientSecret",
+				"CommonIDPConfig.IDPProviderType",
+				"CommonIDPConfig.Name",
+				"CommonIDPConfig.ObjectRoot",
+				"CommonIDPConfig.ObjectRoot.AggregateID",
+				"CommonIDPConfig.ObjectRoot.ChangeDate",
+				"CommonIDPConfig.ObjectRoot.CreationDate",
+				"CommonIDPConfig.ObjectRoot.ResourceOwner",
+				"CommonIDPConfig.ObjectRoot.Sequence",
+				"CommonIDPConfig.State",
+				"CommonIDPConfig.StylingType",
+				"CommonIDPConfig.Type",
 			)
 		})
 	}

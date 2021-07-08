@@ -128,8 +128,8 @@ func writeModelToPrivacyPolicy(wm *PrivacyPolicyWriteModel) *domain.PrivacyPolic
 	}
 }
 
-func writeModelToIDPConfig(wm *IDPConfigWriteModel) *domain.IDPConfig {
-	return &domain.IDPConfig{
+func writeModelToIDPConfig(wm *IDPConfigWriteModel) domain.IDPConfig {
+	return &domain.CommonIDPConfig{
 		ObjectRoot:  writeModelToObjectRoot(wm.WriteModel),
 		IDPConfigID: wm.ConfigID,
 		Name:        wm.Name,
@@ -140,9 +140,12 @@ func writeModelToIDPConfig(wm *IDPConfigWriteModel) *domain.IDPConfig {
 
 func writeModelToIDPOIDCConfig(wm *OIDCConfigWriteModel) *domain.OIDCIDPConfig {
 	return &domain.OIDCIDPConfig{
-		ObjectRoot:            writeModelToObjectRoot(wm.WriteModel),
+		ObjectRoot: writeModelToObjectRoot(wm.WriteModel),
+		CommonIDPConfig: domain.CommonIDPConfig{
+			IDPConfigID: wm.IDPConfigID,
+			State:       wm.State,
+		},
 		ClientID:              wm.ClientID,
-		IDPConfigID:           wm.IDPConfigID,
 		IDPDisplayNameMapping: wm.IDPDisplayNameMapping,
 		Issuer:                wm.Issuer,
 		AuthorizationEndpoint: wm.AuthorizationEndpoint,

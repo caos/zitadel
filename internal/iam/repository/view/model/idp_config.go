@@ -4,24 +4,25 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/caos/zitadel/internal/crypto"
-
-	es_model "github.com/caos/zitadel/internal/iam/repository/eventsourcing/model"
-	org_es_model "github.com/caos/zitadel/internal/org/repository/eventsourcing/model"
-
 	"github.com/caos/logging"
 	"github.com/lib/pq"
 
+	"github.com/caos/zitadel/internal/crypto"
 	caos_errs "github.com/caos/zitadel/internal/errors"
 	"github.com/caos/zitadel/internal/eventstore/v1/models"
 	"github.com/caos/zitadel/internal/iam/model"
+	es_model "github.com/caos/zitadel/internal/iam/repository/eventsourcing/model"
+	org_es_model "github.com/caos/zitadel/internal/org/repository/eventsourcing/model"
+	iam_repo "github.com/caos/zitadel/internal/repository/iam"
+	org_repo "github.com/caos/zitadel/internal/repository/org"
 )
 
 const (
-	IDPConfigKeyIdpConfigID  = "idp_config_id"
-	IDPConfigKeyAggregateID  = "aggregate_id"
-	IDPConfigKeyName         = "name"
-	IDPConfigKeyProviderType = "idp_provider_type"
+	IDPConfigKeyIdpConfigID            = "idp_config_id"
+	IDPConfigKeyAggregateID            = "aggregate_id"
+	IDPConfigKeyName                   = "name"
+	IDPConfigKeyProviderType           = "idp_provider_type"
+	IDPConfigKeyAuthConnectorMachineID = "auth_connector_machine_id"
 )
 
 type IDPConfigView struct {
@@ -33,8 +34,14 @@ type IDPConfigView struct {
 	ChangeDate      time.Time `json:"-" gorm:"column:change_date"`
 	IDPState        int32     `json:"-" gorm:"column:idp_state"`
 	IDPProviderType int32     `json:"-" gorm:"column:idp_provider_type"`
+	Sequence        uint64    `json:"-" gorm:"column:sequence"`
+	ResourceOwner   string    `json:"-" gorm:"column:resource_owner"`
 
-	IsOIDC                     bool                `json:"-" gorm:"column:is_oidc"`
+	*IDPConfigOIDCView
+	*IDPConfigAuthConnectorView
+}
+
+type IDPConfigOIDCView struct {
 	OIDCClientID               string              `json:"clientId" gorm:"column:oidc_client_id"`
 	OIDCClientSecret           *crypto.CryptoValue `json:"clientSecret" gorm:"column:oidc_client_secret"`
 	OIDCIssuer                 string              `json:"issuer" gorm:"column:oidc_issuer"`
@@ -43,31 +50,57 @@ type IDPConfigView struct {
 	OIDCUsernameMapping        int32               `json:"usernameMapping" gorm:"column:oidc_idp_username_mapping"`
 	OAuthAuthorizationEndpoint string              `json:"authorizationEndpoint" gorm:"column:oauth_authorization_endpoint"`
 	OAuthTokenEndpoint         string              `json:"tokenEndpoint" gorm:"column:oauth_token_endpoint"`
+}
 
-	Sequence uint64 `json:"-" gorm:"column:sequence"`
+func (v *IDPConfigOIDCView) IsZero() bool {
+	return v == nil || v.OIDCIssuer == ""
+}
+
+type IDPConfigAuthConnectorView struct {
+	AuthConnectorBaseURL     string `json:"baseUrl" gorm:"column:auth_connector_base_url"`
+	AuthConnectorProviderID  string `json:"providerId" gorm:"column:auth_connector_provider_id"`
+	AuthConnectorMachineID   string `json:"machineId" gorm:"column:auth_connector_machine_id"`
+	AuthConnectorMachineName string `json:"-" gorm:"column:auth_connector_machine_name"`
+}
+
+func (v *IDPConfigAuthConnectorView) IsZero() bool {
+	return v == nil || v.AuthConnectorBaseURL == ""
 }
 
 func IDPConfigViewToModel(idp *IDPConfigView) *model.IDPConfigView {
-	return &model.IDPConfigView{
-		IDPConfigID:                idp.IDPConfigID,
-		AggregateID:                idp.AggregateID,
-		State:                      model.IDPConfigState(idp.IDPState),
-		Name:                       idp.Name,
-		StylingType:                model.IDPStylingType(idp.StylingType),
-		Sequence:                   idp.Sequence,
-		CreationDate:               idp.CreationDate,
-		ChangeDate:                 idp.ChangeDate,
-		IDPProviderType:            model.IDPProviderType(idp.IDPProviderType),
-		IsOIDC:                     idp.IsOIDC,
-		OIDCClientID:               idp.OIDCClientID,
-		OIDCClientSecret:           idp.OIDCClientSecret,
-		OIDCIssuer:                 idp.OIDCIssuer,
-		OIDCScopes:                 idp.OIDCScopes,
-		OIDCIDPDisplayNameMapping:  model.OIDCMappingField(idp.OIDCIDPDisplayNameMapping),
-		OIDCUsernameMapping:        model.OIDCMappingField(idp.OIDCUsernameMapping),
-		OAuthAuthorizationEndpoint: idp.OAuthAuthorizationEndpoint,
-		OAuthTokenEndpoint:         idp.OAuthTokenEndpoint,
+	idpView := &model.IDPConfigView{
+		IDPConfigID:     idp.IDPConfigID,
+		AggregateID:     idp.AggregateID,
+		State:           model.IDPConfigState(idp.IDPState),
+		Name:            idp.Name,
+		StylingType:     model.IDPStylingType(idp.StylingType),
+		Sequence:        idp.Sequence,
+		ResourceOwner:   idp.ResourceOwner,
+		CreationDate:    idp.CreationDate,
+		ChangeDate:      idp.ChangeDate,
+		IDPProviderType: model.IDPProviderType(idp.IDPProviderType),
 	}
+	if !idp.IDPConfigOIDCView.IsZero() {
+		idpView.IDPConfigOIDCView = &model.IDPConfigOIDCView{
+			OIDCClientID:               idp.OIDCClientID,
+			OIDCClientSecret:           idp.OIDCClientSecret,
+			OIDCIssuer:                 idp.OIDCIssuer,
+			OIDCScopes:                 idp.OIDCScopes,
+			OIDCIDPDisplayNameMapping:  model.OIDCMappingField(idp.OIDCIDPDisplayNameMapping),
+			OIDCUsernameMapping:        model.OIDCMappingField(idp.OIDCUsernameMapping),
+			OAuthAuthorizationEndpoint: idp.OAuthAuthorizationEndpoint,
+			OAuthTokenEndpoint:         idp.OAuthTokenEndpoint,
+		}
+	}
+	if !idp.IDPConfigAuthConnectorView.IsZero() {
+		idpView.IDPConfigAuthConnectorView = &model.IDPConfigAuthConnectorView{
+			AuthConnectorBaseURL:     idp.AuthConnectorBaseURL,
+			AuthConnectorProviderID:  idp.AuthConnectorProviderID,
+			AuthConnectorMachineID:   idp.AuthConnectorMachineID,
+			AuthConnectorMachineName: idp.AuthConnectorMachineName,
+		}
+	}
+	return idpView
 }
 
 func IdpConfigViewsToModel(idps []*IDPConfigView) []*model.IDPConfigView {
@@ -87,22 +120,30 @@ func (i *IDPConfigView) AppendEvent(providerType model.IDPProviderType, event *m
 		i.CreationDate = event.CreationDate
 		i.IDPProviderType = int32(providerType)
 		err = i.SetData(event)
-	case es_model.OIDCIDPConfigAdded, org_es_model.OIDCIDPConfigAdded:
-		i.IsOIDC = true
+	case es_model.OIDCIDPConfigAdded, org_es_model.OIDCIDPConfigAdded,
+		models.EventType(iam_repo.IDPAuthConnectorConfigAddedEventType),
+		models.EventType(org_repo.IDPAuthConnectorConfigAddedEventType),
+		es_model.OIDCIDPConfigChanged, org_es_model.OIDCIDPConfigChanged,
+		es_model.IDPConfigChanged, org_es_model.IDPConfigChanged,
+		models.EventType(iam_repo.IDPAuthConnectorConfigChangedEventType),
+		models.EventType(org_repo.IDPAuthConnectorConfigChangedEventType):
 		err = i.SetData(event)
-	case es_model.OIDCIDPConfigChanged, org_es_model.OIDCIDPConfigChanged,
-		es_model.IDPConfigChanged, org_es_model.IDPConfigChanged:
-		err = i.SetData(event)
+	case models.EventType(iam_repo.IDPAuthConnectorMachineUserRemovedEventType),
+		models.EventType(org_repo.IDPAuthConnectorMachineUserRemovedEventType):
+		i.AuthConnectorMachineID = ""
 	case es_model.IDPConfigDeactivated, org_es_model.IDPConfigDeactivated:
 		i.IDPState = int32(model.IDPConfigStateInactive)
+		err = i.SetData(event)
 	case es_model.IDPConfigReactivated, org_es_model.IDPConfigReactivated:
 		i.IDPState = int32(model.IDPConfigStateActive)
+		err = i.SetData(event)
 	}
 	return err
 }
 
 func (r *IDPConfigView) setRootData(event *models.Event) {
 	r.AggregateID = event.AggregateID
+	r.ResourceOwner = event.ResourceOwner
 }
 
 func (r *IDPConfigView) SetData(event *models.Event) error {

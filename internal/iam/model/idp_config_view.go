@@ -17,9 +17,14 @@ type IDPConfigView struct {
 	CreationDate    time.Time
 	ChangeDate      time.Time
 	Sequence        uint64
+	ResourceOwner   string
 	IDPProviderType IDPProviderType
 
-	IsOIDC                     bool
+	*IDPConfigOIDCView
+	*IDPConfigAuthConnectorView
+}
+
+type IDPConfigOIDCView struct {
 	OIDCClientID               string
 	OIDCClientSecret           *crypto.CryptoValue
 	OIDCIssuer                 string
@@ -28,6 +33,13 @@ type IDPConfigView struct {
 	OIDCUsernameMapping        OIDCMappingField
 	OAuthAuthorizationEndpoint string
 	OAuthTokenEndpoint         string
+}
+
+type IDPConfigAuthConnectorView struct {
+	AuthConnectorBaseURL     string
+	AuthConnectorProviderID  string
+	AuthConnectorMachineID   string
+	AuthConnectorMachineName string
 }
 
 type IDPConfigSearchRequest struct {
@@ -46,6 +58,7 @@ const (
 	IDPConfigSearchKeyAggregateID
 	IDPConfigSearchKeyIdpConfigID
 	IDPConfigSearchKeyIdpProviderType
+	IDPConfigSearchKeyAuthConnectorMachineID
 )
 
 type IDPConfigSearchQuery struct {

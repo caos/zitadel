@@ -9,6 +9,20 @@ title: zitadel/idp.proto
 ## Messages
 
 
+### AuthConnectorConfig
+
+
+
+| Field | Type | Description | Validation |
+| ----- | ---- | ----------- | ----------- |
+| base_url |  string | - |  |
+| provider_id |  string | - |  |
+| machine_id |  string | - |  |
+| machine_name |  string | - |  |
+
+
+
+
 ### IDP
 
 
@@ -22,6 +36,7 @@ title: zitadel/idp.proto
 | styling_type |  IDPStylingType | - |  |
 | owner |  IDPOwnerType | - |  |
 | [**oneof**](https://developers.google.com/protocol-buffers/docs/proto3#oneof) config.oidc_config |  OIDCConfig | - |  |
+| [**oneof**](https://developers.google.com/protocol-buffers/docs/proto3#oneof) config.authenticator_config |  AuthConnectorConfig | - |  |
 
 
 
@@ -163,7 +178,8 @@ authorization framework of the identity provider
 | Name | Number | Description |
 | ---- | ------ | ----------- |
 | IDP_TYPE_UNSPECIFIED | 0 | - |
-| IDP_TYPE_OIDC | 1 | PLANNED: IDP_TYPE_SAML |
+| IDP_TYPE_OIDC | 1 | - |
+| IPD_TYPE_AUTH_CONNECTOR | 2 | PLANNED: IDP_TYPE_SAML |
 
 
 

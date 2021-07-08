@@ -1,8 +1,14 @@
 package handler
 
 import (
+	"context"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/caos/oidc/pkg/client/rp"
 	"github.com/caos/oidc/pkg/oidc"
+	"github.com/caos/oidc/pkg/op"
 	"golang.org/x/oauth2"
 
 	http_mw "github.com/caos/zitadel/internal/api/http/middleware"
@@ -11,9 +17,7 @@ import (
 	"github.com/caos/zitadel/internal/errors"
 	caos_errors "github.com/caos/zitadel/internal/errors"
 	iam_model "github.com/caos/zitadel/internal/iam/model"
-	"net/http"
-	"strings"
-	"time"
+	"github.com/caos/zitadel/internal/user/model"
 )
 
 const (
@@ -26,8 +30,9 @@ type externalIDPData struct {
 }
 
 type externalIDPCallbackData struct {
-	State string `schema:"state"`
-	Code  string `schema:"code"`
+	State     string `schema:"state"`
+	Code      string `schema:"code"`
+	Assertion string `schema:"assertion"`
 }
 
 type externalNotFoundOptionFormData struct {
@@ -76,16 +81,25 @@ func (l *Login) handleIDP(w http.ResponseWriter, r *http.Request, authReq *domai
 		l.renderLogin(w, r, authReq, err)
 		return
 	}
-	if !idpConfig.IsOIDC {
-		l.renderError(w, r, authReq, caos_errors.ThrowInternal(nil, "LOGIN-Rio9s", "Errors.User.ExternalIDP.IDPTypeNotImplemented"))
+	if idpConfig.IDPConfigOIDCView != nil {
+		l.handleOIDCAuthorize(w, r, authReq, idpConfig, EndpointExternalLoginCallback)
 		return
 	}
-	l.handleOIDCAuthorize(w, r, authReq, idpConfig, EndpointExternalLoginCallback)
+	if idpConfig.IDPConfigAuthConnectorView != nil {
+		l.handleAuthConnectorAuthorize(w, r, authReq, idpConfig.IDPConfigAuthConnectorView)
+	}
+	l.renderError(w, r, authReq, caos_errors.ThrowInternal(nil, "LOGIN-Rio9s", "Errors.User.ExternalIDP.IDPTypeNotImplemented"))
 }
 
 func (l *Login) handleOIDCAuthorize(w http.ResponseWriter, r *http.Request, authReq *domain.AuthRequest, idpConfig *iam_model.IDPConfigView, callbackEndpoint string) {
 	provider := l.getRPConfig(w, r, authReq, idpConfig, callbackEndpoint)
 	http.Redirect(w, r, rp.AuthURL(authReq.ID, provider, rp.WithPrompt(oidc.PromptSelectAccount)), http.StatusFound)
+}
+
+func (l *Login) handleAuthConnectorAuthorize(w http.ResponseWriter, r *http.Request, authReq *domain.AuthRequest, connectorConfig *iam_model.IDPConfigAuthConnectorView) {
+	const connectorAuthorize = "authorize"
+	url := strings.TrimSuffix(connectorConfig.AuthConnectorBaseURL, "/") + "/" + connectorAuthorize + "?authRequestID=" + authReq.ID + "&connectorID=" + connectorConfig.AuthConnectorProviderID
+	http.Redirect(w, r, url, http.StatusFound)
 }
 
 func (l *Login) handleExternalLoginCallback(w http.ResponseWriter, r *http.Request) {
@@ -106,13 +120,81 @@ func (l *Login) handleExternalLoginCallback(w http.ResponseWriter, r *http.Reque
 		l.renderError(w, r, authReq, err)
 		return
 	}
-	provider := l.getRPConfig(w, r, authReq, idpConfig, EndpointExternalLoginCallback)
-	tokens, err := rp.CodeExchange(r.Context(), data.Code, provider)
+	if idpConfig.IDPConfigOIDCView != nil {
+		provider := l.getRPConfig(w, r, authReq, idpConfig, EndpointExternalLoginCallback)
+		tokens, err := rp.CodeExchange(r.Context(), data.Code, provider)
+		if err != nil {
+			l.renderLogin(w, r, authReq, err)
+			return
+		}
+		l.handleExternalUserAuthenticated(w, r, authReq, idpConfig, userAgentID, tokens)
+	}
+	if idpConfig.IDPConfigAuthConnectorView != nil {
+		l.handleExternalLoginCallbackAuthConnector(w, r, authReq, data, idpConfig)
+	}
+}
+
+func (l *Login) handleExternalLoginCallbackAuthConnector(w http.ResponseWriter, r *http.Request, authReq *domain.AuthRequest, data *externalIDPCallbackData, idpConfig *iam_model.IDPConfigView) {
+	profile, user, err := l.verifyAuthConnectorCallback(r.Context(), authReq, data, idpConfig)
 	if err != nil {
 		l.renderLogin(w, r, authReq, err)
 		return
 	}
-	l.handleExternalUserAuthenticated(w, r, authReq, idpConfig, userAgentID, tokens)
+
+	externalUser := &domain.ExternalUser{
+		IDPConfigID:    idpConfig.IDPConfigID,
+		ExternalUserID: profile.Subject,
+	}
+
+	if err = l.linkAuthConnectorUser(r, authReq, user, externalUser); err != nil {
+		l.renderLogin(w, r, authReq, err)
+		return
+	}
+	l.renderNextStep(w, r, authReq)
+}
+
+func (l *Login) verifyAuthConnectorCallback(ctx context.Context, authReq *domain.AuthRequest, data *externalIDPCallbackData, idpConfig *iam_model.IDPConfigView) (*oidc.JWTTokenRequest, *model.UserView, error) {
+	profile, err := op.VerifyJWTAssertion(ctx, data.Assertion, l.authConnectorVerifier)
+	if err != nil {
+		return nil, nil, err
+	}
+	if authReq.ID != profile.GetCustomClaim("jti") {
+		return nil, nil, caos_errors.ThrowInvalidArgument(nil, "LOGIN-dg4gh", "Errors.User.ExternalIDP.DataInvalid")
+	}
+	if profile.Issuer != idpConfig.AuthConnectorMachineID {
+		return nil, nil, caos_errors.ThrowInvalidArgument(nil, "LOGIN-Gdg2d", "Errors.User.ExternalIDP.DataInvalid")
+	}
+	user, err := l.authRepo.UserByID(ctx, profile.Subject)
+	if err != nil {
+		return nil, nil, err
+	}
+	if idpConfig.AggregateID != domain.IAMID && user.ResourceOwner != idpConfig.AggregateID {
+		return nil, nil, caos_errors.ThrowInvalidArgument(nil, "LOGIN-Vbb25", "Errors.User.ExternalIDP.NotAllowed")
+	}
+	return profile, user, err
+}
+
+func (l *Login) linkAuthConnectorUser(r *http.Request, authReq *domain.AuthRequest, user *model.UserView, externalUser *domain.ExternalUser) error {
+	ctx := setContext(r.Context(), user.ResourceOwner)
+	userAgentID, _ := http_mw.UserAgentIDFromCtx(ctx)
+	if len(authReq.LinkingUsers) > 0 {
+		err := l.authRepo.ResetLinkingUsers(ctx, authReq.ID, userAgentID)
+		if err != nil {
+			return err
+		}
+	}
+	err := l.authRepo.CheckExternalUserLogin(ctx, authReq.ID, userAgentID, externalUser, domain.BrowserInfoFromRequest(r))
+	if err == nil {
+		return nil
+	}
+	if !errors.IsNotFound(err) {
+		return err
+	}
+	err = l.authRepo.SelectUser(ctx, authReq.ID, user.ID, userAgentID)
+	if err != nil {
+		return err
+	}
+	return l.authRepo.LinkExternalUsers(ctx, authReq.ID, userAgentID, domain.BrowserInfoFromRequest(r))
 }
 
 func (l *Login) getRPConfig(w http.ResponseWriter, r *http.Request, authReq *domain.AuthRequest, idpConfig *iam_model.IDPConfigView, callbackEndpoint string) rp.RelyingParty {

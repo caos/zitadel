@@ -28,19 +28,24 @@ func ModelIDPViewToPb(idp *iam_model.IDPConfigView) *idp_pb.IDP {
 			idp.Sequence,
 			idp.CreationDate,
 			idp.ChangeDate,
-			"", //TODO: backend
+			idp.ResourceOwner,
 		),
 	}
 }
 
-func IDPViewToPb(idp *domain.IDPConfigView) *idp_pb.IDP {
+func IDPConfigToPb(idp domain.IDPConfig) *idp_pb.IDP {
 	mapped := &idp_pb.IDP{
-		Id:          idp.AggregateID,
-		State:       IDPStateToPb(idp.State),
-		Name:        idp.Name,
-		StylingType: IDPStylingTypeToPb(idp.StylingType),
-		Config:      IDPViewToConfigPb(idp),
-		Details:     obj_grpc.ToViewDetailsPb(idp.Sequence, idp.CreationDate, idp.ChangeDate, ""), //TODO: resource owner in view
+		Id:          idp.ObjectDetails().AggregateID,
+		State:       IDPStateToPb(idp.IDPConfigState()),
+		Name:        idp.IDPConfigName(),
+		StylingType: IDPStylingTypeToPb(idp.IDPConfigStylingType()),
+		Config:      IDPConfigToConfigPb(idp),
+		Details: obj_grpc.ToViewDetailsPb(
+			idp.ObjectDetails().Sequence,
+			idp.ObjectDetails().CreationDate,
+			idp.ObjectDetails().ChangeDate,
+			idp.ObjectDetails().ResourceOwner,
+		),
 	}
 	return mapped
 }
@@ -57,7 +62,29 @@ func ExternalIDPViewToLoginPolicyLinkPb(link *iam_model.IDPProviderView) *idp_pb
 	return &idp_pb.IDPLoginPolicyLink{
 		IdpId:   link.IDPConfigID,
 		IdpName: link.Name,
-		IdpType: idp_pb.IDPType_IDP_TYPE_OIDC,
+		IdpType: IDPConfigTypeModelToPb(link.IDPConfigType),
+	}
+}
+
+func IDPConfigTypeModelToPb(configType iam_model.IdpConfigType) idp_pb.IDPType {
+	switch configType {
+	case iam_model.IDPConfigTypeOIDC:
+		return idp_pb.IDPType_IDP_TYPE_OIDC
+	case iam_model.IDPConfigTypeAuthConnector:
+		return idp_pb.IDPType_IPD_TYPE_AUTH_CONNECTOR
+	default:
+		return idp_pb.IDPType_IDP_TYPE_OIDC
+	}
+}
+
+func IDPConfigTypeToPb(configType domain.IDPConfigType) idp_pb.IDPType {
+	switch configType {
+	case domain.IDPConfigTypeOIDC:
+		return idp_pb.IDPType_IDP_TYPE_OIDC
+	case domain.IDPConfigTypeAuthConnector:
+		return idp_pb.IDPType_IPD_TYPE_AUTH_CONNECTOR
+	default:
+		return idp_pb.IDPType_IDP_TYPE_OIDC
 	}
 }
 
@@ -76,8 +103,7 @@ func ExternalIDPViewToUserLinkPb(link *user_model.ExternalIDPView) *idp_pb.IDPUs
 		IdpName:          link.IDPName,
 		ProvidedUserId:   link.ExternalUserID,
 		ProvidedUserName: link.UserDisplayName,
-		//TODO: as soon as saml is implemented we need to switch here
-		IdpType: idp_pb.IDPType_IDP_TYPE_OIDC,
+		IdpType:          IDPConfigTypeToPb(link.IDPConfigType),
 	}
 }
 
@@ -130,32 +156,58 @@ func IDPStylingTypeToPb(stylingType domain.IDPConfigStylingType) idp_pb.IDPStyli
 	}
 }
 
-func ModelIDPViewToConfigPb(config *iam_model.IDPConfigView) *idp_pb.IDP_OidcConfig {
-	return &idp_pb.IDP_OidcConfig{
-		OidcConfig: &idp_pb.OIDCConfig{
-			ClientId:              config.OIDCClientID,
-			Issuer:                config.OIDCIssuer,
-			Scopes:                config.OIDCScopes,
-			DisplayNameMapping:    ModelMappingFieldToPb(config.OIDCIDPDisplayNameMapping),
-			UsernameMapping:       ModelMappingFieldToPb(config.OIDCUsernameMapping),
-			AuthorizationEndpoint: config.OAuthAuthorizationEndpoint,
-			TokenEndpoint:         config.OAuthTokenEndpoint,
-		},
+func ModelIDPViewToConfigPb(config *iam_model.IDPConfigView) idp_pb.IDPConfig {
+	if config.IDPConfigOIDCView != nil {
+		return &idp_pb.IDP_OidcConfig{
+			OidcConfig: &idp_pb.OIDCConfig{
+				ClientId:              config.OIDCClientID,
+				Issuer:                config.OIDCIssuer,
+				Scopes:                config.OIDCScopes,
+				DisplayNameMapping:    ModelMappingFieldToPb(config.OIDCIDPDisplayNameMapping),
+				UsernameMapping:       ModelMappingFieldToPb(config.OIDCUsernameMapping),
+				AuthorizationEndpoint: config.OAuthAuthorizationEndpoint,
+				TokenEndpoint:         config.OAuthTokenEndpoint,
+			},
+		}
 	}
+	if config.IDPConfigAuthConnectorView != nil {
+		return &idp_pb.IDP_AuthenticatorConfig{
+			AuthenticatorConfig: &idp_pb.AuthConnectorConfig{
+				BaseUrl:     config.AuthConnectorBaseURL,
+				ProviderId:  config.AuthConnectorProviderID,
+				MachineId:   config.AuthConnectorMachineID,
+				MachineName: config.AuthConnectorMachineName,
+			},
+		}
+	}
+	return nil
 }
 
-func IDPViewToConfigPb(config *domain.IDPConfigView) *idp_pb.IDP_OidcConfig {
-	return &idp_pb.IDP_OidcConfig{
-		OidcConfig: &idp_pb.OIDCConfig{
-			ClientId:              config.OIDCClientID,
-			Issuer:                config.OIDCIssuer,
-			AuthorizationEndpoint: config.OAuthAuthorizationEndpoint,
-			TokenEndpoint:         config.OAuthTokenEndpoint,
-			Scopes:                config.OIDCScopes,
-			DisplayNameMapping:    MappingFieldToPb(config.OIDCIDPDisplayNameMapping),
-			UsernameMapping:       MappingFieldToPb(config.OIDCUsernameMapping),
-		},
+func IDPConfigToConfigPb(config domain.IDPConfig) idp_pb.IDPConfig {
+	switch c := config.(type) {
+	case *domain.OIDCIDPConfig:
+		return &idp_pb.IDP_OidcConfig{
+			OidcConfig: &idp_pb.OIDCConfig{
+				ClientId:              c.ClientID,
+				Issuer:                c.Issuer,
+				AuthorizationEndpoint: c.AuthorizationEndpoint,
+				TokenEndpoint:         c.TokenEndpoint,
+				Scopes:                c.Scopes,
+				DisplayNameMapping:    MappingFieldToPb(c.IDPDisplayNameMapping),
+				UsernameMapping:       MappingFieldToPb(c.UsernameMapping),
+			},
+		}
+	case *domain.AuthConnectorIDPConfig:
+		return &idp_pb.IDP_AuthenticatorConfig{
+			AuthenticatorConfig: &idp_pb.AuthConnectorConfig{
+				BaseUrl:     c.BaseURL,
+				ProviderId:  c.ProviderID,
+				MachineId:   c.MachineID,
+				MachineName: c.MachineName,
+			},
+		}
 	}
+	return nil
 }
 
 func FieldNameToModel(fieldName idp_pb.IDPFieldName) iam_model.IDPConfigSearchKey {

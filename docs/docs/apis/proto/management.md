@@ -2451,6 +2451,18 @@ Provider must be OIDC compliant
     POST: /idps/oidc
 
 
+### AddOrgAuthConnectorIDP
+
+> **rpc** AddOrgAuthConnectorIDP([AddOrgAuthConnectorIDPRequest](#addorgauthconnectoridprequest))
+[AddOrgAuthConnectorIDPResponse](#addorgauthconnectoridpresponse)
+
+Add a new ZITADEL AuthConnector identity provider configuration in the organisation
+
+
+
+    POST: /idps/auth_connector
+
+
 ### DeactivateOrgIDP
 
 > **rpc** DeactivateOrgIDP([DeactivateOrgIDPRequest](#deactivateorgidprequest))
@@ -2513,6 +2525,18 @@ Change OIDC identity provider configuration of the organisation
 
 
     PUT: /idps/{idp_id}/oidc_config
+
+
+### UpdateOrgIDPAuthConnectorConfig
+
+> **rpc** UpdateOrgIDPAuthConnectorConfig([UpdateOrgIDPAuthConnectorConfigRequest](#updateorgidpauthconnectorconfigrequest))
+[UpdateOrgIDPAuthConnectorConfigResponse](#updateorgidpauthconnectorconfigresponse)
+
+Change auth connector identity provider configuration of the organisation
+
+
+
+    PUT: /idps/{idp_id}/auth_connector_config
 
 
 
@@ -2948,6 +2972,33 @@ This is an empty request
 | client_secret |  string | - |  |
 | none_compliant |  bool | - |  |
 | compliance_problems | repeated zitadel.v1.LocalizedMessage | - |  |
+
+
+
+
+### AddOrgAuthConnectorIDPRequest
+
+
+
+| Field | Type | Description | Validation |
+| ----- | ---- | ----------- | ----------- |
+| name |  string | - | string.min_len: 1<br /> string.max_len: 200<br />  |
+| styling_type |  zitadel.idp.v1.IDPStylingType | - | enum.defined_only: true<br />  |
+| base_url |  string | - | string.min_len: 1<br /> string.max_len: 200<br />  |
+| provider_id |  string | - |  |
+| machine_id |  string | - | string.min_len: 1<br /> string.max_len: 200<br />  |
+
+
+
+
+### AddOrgAuthConnectorIDPResponse
+
+
+
+| Field | Type | Description | Validation |
+| ----- | ---- | ----------- | ----------- |
+| details |  zitadel.v1.ObjectDetails | - |  |
+| idp_id |  string | - |  |
 
 
 
@@ -6884,6 +6935,31 @@ This is an empty request
 
 
 ### UpdateOIDCAppConfigResponse
+
+
+
+| Field | Type | Description | Validation |
+| ----- | ---- | ----------- | ----------- |
+| details |  zitadel.v1.ObjectDetails | - |  |
+
+
+
+
+### UpdateOrgIDPAuthConnectorConfigRequest
+
+
+
+| Field | Type | Description | Validation |
+| ----- | ---- | ----------- | ----------- |
+| idp_id |  string | - | string.min_len: 1<br /> string.max_len: 200<br />  |
+| base_url |  string | - | string.min_len: 1<br /> string.max_len: 200<br />  |
+| provider_id |  string | - |  |
+| machine_id |  string | - | string.min_len: 1<br /> string.max_len: 200<br />  |
+
+
+
+
+### UpdateOrgIDPAuthConnectorConfigResponse
 
 
 
