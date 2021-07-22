@@ -10,6 +10,7 @@ import (
 
 	"github.com/caos/zitadel/internal/api/authz"
 	"github.com/caos/zitadel/internal/api/grpc/authn"
+	"github.com/caos/zitadel/internal/api/grpc/metadata"
 	"github.com/caos/zitadel/internal/api/grpc/object"
 	user_grpc "github.com/caos/zitadel/internal/api/grpc/user"
 	"github.com/caos/zitadel/internal/domain"
@@ -35,6 +36,27 @@ func ListUsersRequestToModel(ctx context.Context, req *mgmt_pb.ListUsersRequest)
 		Limit:   limit,
 		Asc:     asc,
 		Queries: user_grpc.UserQueriesToModel(req.Queries),
+	}
+}
+
+func BulkSetMetaDataToDomain(req *mgmt_pb.BulkSetUserMetaDataRequest) []*domain.MetaData {
+	metaData := make([]*domain.MetaData, len(req.MetaData))
+	for i, data := range req.MetaData {
+		metaData[i] = &domain.MetaData{
+			Key:   data.Key,
+			Value: data.Value,
+		}
+	}
+	return metaData
+}
+
+func ListUserMetaDataToDomain(req *mgmt_pb.ListUserMetaDataRequest) *domain.MetaDataSearchRequest {
+	offset, limit, asc := object.ListQueryToModel(req.Query)
+	return &domain.MetaDataSearchRequest{
+		Offset:  offset,
+		Limit:   limit,
+		Asc:     asc,
+		Queries: metadata.MetaDataQueriesToModel(req.Queries),
 	}
 }
 

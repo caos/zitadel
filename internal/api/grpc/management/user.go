@@ -7,10 +7,12 @@ import (
 	"github.com/caos/zitadel/internal/api/grpc/authn"
 	change_grpc "github.com/caos/zitadel/internal/api/grpc/change"
 	idp_grpc "github.com/caos/zitadel/internal/api/grpc/idp"
+	"github.com/caos/zitadel/internal/api/grpc/metadata"
 	"github.com/caos/zitadel/internal/api/grpc/object"
 	obj_grpc "github.com/caos/zitadel/internal/api/grpc/object"
 	"github.com/caos/zitadel/internal/api/grpc/user"
 	user_grpc "github.com/caos/zitadel/internal/api/grpc/user"
+	"github.com/caos/zitadel/internal/domain"
 	grant_model "github.com/caos/zitadel/internal/usergrant/model"
 	mgmt_pb "github.com/caos/zitadel/pkg/grpc/management"
 )
@@ -73,6 +75,79 @@ func (s *Server) IsUserUnique(ctx context.Context, req *mgmt_pb.IsUserUniqueRequ
 	}
 	return &mgmt_pb.IsUserUniqueResponse{
 		IsUnique: unique,
+	}, nil
+}
+
+func (s *Server) ListUserMetaData(ctx context.Context, req *mgmt_pb.ListUserMetaDataRequest) (*mgmt_pb.ListUserMetaDataResponse, error) {
+	res, err := s.user.SearchMetaData(ctx, req.Id, authz.GetCtxData(ctx).OrgID, ListUserMetaDataToDomain(req))
+	if err != nil {
+		return nil, err
+	}
+	return &mgmt_pb.ListUserMetaDataResponse{
+		Result: metadata.MetaDataListToPb(res.Result),
+		Details: obj_grpc.ToListDetails(
+			res.TotalResult,
+			res.Sequence,
+			res.Timestamp,
+		),
+	}, nil
+}
+
+func (s *Server) GetUserMetaData(ctx context.Context, req *mgmt_pb.GetUserMetaDataRequest) (*mgmt_pb.GetUserMetaDataResponse, error) {
+	data, err := s.user.GetMetaDataByKey(ctx, req.Id, authz.GetCtxData(ctx).OrgID, req.Key)
+	if err != nil {
+		return nil, err
+	}
+	return &mgmt_pb.GetUserMetaDataResponse{
+		MetaData: metadata.DomainMetaDataToPb(data),
+	}, nil
+}
+
+func (s *Server) SetUserMetaData(ctx context.Context, req *mgmt_pb.SetUserMetaDataRequest) (*mgmt_pb.SetUserMetaDataResponse, error) {
+	ctxData := authz.GetCtxData(ctx)
+	result, err := s.command.SetUserMetaData(ctx, &domain.MetaData{Key: req.Key, Value: req.Value}, req.Id, ctxData.ResourceOwner)
+	if err != nil {
+		return nil, err
+	}
+	return &mgmt_pb.SetUserMetaDataResponse{
+		Details: obj_grpc.AddToDetailsPb(
+			result.Sequence,
+			result.ChangeDate,
+			result.ResourceOwner,
+		),
+	}, nil
+}
+
+func (s *Server) BulkSetUserMetaData(ctx context.Context, req *mgmt_pb.BulkSetUserMetaDataRequest) (*mgmt_pb.BulkSetUserMetaDataResponse, error) {
+	ctxData := authz.GetCtxData(ctx)
+	result, err := s.command.BulkSetUserMetaData(ctx, req.Id, ctxData.ResourceOwner, BulkSetMetaDataToDomain(req)...)
+	if err != nil {
+		return nil, err
+	}
+	return &mgmt_pb.BulkSetUserMetaDataResponse{
+		Details: obj_grpc.DomainToChangeDetailsPb(result),
+	}, nil
+}
+
+func (s *Server) RemoveUserMetaData(ctx context.Context, req *mgmt_pb.RemoveUserMetaDataRequest) (*mgmt_pb.RemoveUserMetaDataResponse, error) {
+	ctxData := authz.GetCtxData(ctx)
+	result, err := s.command.RemoveUserMetaData(ctx, req.Key, req.Id, ctxData.ResourceOwner)
+	if err != nil {
+		return nil, err
+	}
+	return &mgmt_pb.RemoveUserMetaDataResponse{
+		Details: obj_grpc.DomainToChangeDetailsPb(result),
+	}, nil
+}
+
+func (s *Server) BulkRemoveUserMetaData(ctx context.Context, req *mgmt_pb.BulkRemoveUserMetaDataRequest) (*mgmt_pb.BulkRemoveUserMetaDataResponse, error) {
+	ctxData := authz.GetCtxData(ctx)
+	result, err := s.command.BulkRemoveUserMetaData(ctx, req.Id, ctxData.ResourceOwner, req.Keys...)
+	if err != nil {
+		return nil, err
+	}
+	return &mgmt_pb.BulkRemoveUserMetaDataResponse{
+		Details: obj_grpc.DomainToChangeDetailsPb(result),
 	}, nil
 }
 
